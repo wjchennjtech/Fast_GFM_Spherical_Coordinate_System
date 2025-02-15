@@ -16,7 +16,6 @@ function varargout = Spherical_Coordinate_Fast_Gravity_Forward_Modeling(varargin
 %      stop.  All inputs are passed to Spherical_Coordinate_Fast_Gravity_Forward_Modeling_OpeningFcn via varargin.
 %
 %      *See GUI Options on GUIDE's Tools menu.  Choose "GUI allows only one
-%      
 %      instance to run (singleton)".
 %
 % See also: GUIDE, GUIDATA, GUIHANDLES
@@ -149,76 +148,29 @@ function pushbutton2_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 global data;global nlon;global nlat;global nlayers;
 
-
+lon_min=str2double(get(handles.edit1,'string'));
+lon_max=str2double(get(handles.edit2,'string'));
+dlon=abs(str2double(get(handles.edit3,'string')));
+lat_min=str2double(get(handles.edit4,'string'));
+lat_max=str2double(get(handles.edit5,'string'));
+dlat=abs(str2double(get(handles.edit6,'string')));
 nmax=str2double(get(handles.edit7,'string'));
 caculat_height=str2double(get(handles.edit8,'string'));
 Lat=0;
 Lon=0;
 if handles.radiobutton6.Value == 1
-lon_min=str2double(get(handles.edit1,'string'));
-lon_max=str2double(get(handles.edit2,'string'));
-lat_min=str2double(get(handles.edit4,'string'));
-lat_max=str2double(get(handles.edit5,'string'));
-
-dlon=abs(str2double(get(handles.edit3,'string')));
-dlat=abs(str2double(get(handles.edit6,'string')));
-if isnan(dlat)
-dlat=abs(eval(get(handles.edit6,'string')));
-end
-if isnan(dlon)
-dlon=abs(eval(get(handles.edit3,'string')));
-end
-nlon=360/dlon;
-nlat=180/dlat;    
-Lat=linspace(lat_max,lat_min,nlat);
-Lon=linspace(lon_min,lon_max,nlon);
+Lat=lat_max:-dlat:lat_min;
+Lon=lon_min:dlon:lon_max;
 
 elseif handles.radiobutton7.Value == 1
 data_table=get(handles.uitable7,'data');
 Lat=data_table(:,2);
 Lon=data_table(:,1);
 end
-
-%%
-%estimate the input data
-lonmax=max(data(:,1));lonmin=min(data(:,1));
-latmax=max(data(:,2));latmin=min(data(:,2));
-ifzero=0;
-for i=1:size(data,1)
-Dlon1=rem(abs(data(1,1)-data(2,1)),1);
-Dlon2=rem(abs(data(1,1)-data(i+2,1)),1);
-if Dlon1==0 && Dlon2==0
-Dlon=abs(data(1,1)-data(2,1));
-if any(rem(lonmin,1))
+Dlat=abs(data(1,1)-data(2,1));
+Dlon=Dlat;
+Nlat=180/Dlat;
 Nlon=360/Dlon;
-else
-Nlon=360/Dlon+1;
-ifzero=1;
-end
-break;
-end
-
-if Dlon1>Dlon2
-numb_lon=i+2;
-Dlon=1/(numb_lon-1);
-
-if any(rem(lonmin,1))
-Nlon=360/Dlon;
-else
-Nlon=360/Dlon+1;
-ifzero=1;
-end
-break;
-end
-end
-
-Nlat=size(data,1)/Nlon/nlayers;
-if ifzero==0
-Dlat=180/Nlat;
-else
-Dlat=180/(Nlat-1);    
-end
-%%
 f=[];
 if handles.radiobutton6.Value == 1
 fresult=zeros(nlat*nlon,3);
@@ -230,15 +182,14 @@ gravity_potential=0;
 gravity_attraction=0;
 gravity_gradient=0;
 if handles.radiobutton1.Value == 1
-%straight
+%直接
 nrow=size(data,1)/nlayers;
-tic
 for i=1:nlayers
-%to computa multi-layers 
+
 DATA=data((i-1)*nrow+1:i*nrow,:);
 [result_cnm_snm]=analysis_straight(nmax,Dlat,Dlon,Nlat,Nlon,DATA);
 if handles.radiobutton6.Value == 1
-[Gravity_potential,Gravity_attraction,Gravity_gradient]=synthesis_straight(result_cnm_snm,nmax,lat_max,lat_min,lon_max,lon_min,dlat,dlon,caculat_height);
+[Gravity_potential,Gravity_attraction,Gravity_gradient]=synthesis_straight(result_cnm_snm,nmax,Lat,Lon,caculat_height);
 elseif handles.radiobutton7.Value == 1
 [Gravity_potential,Gravity_attraction,Gravity_gradient]=synthesis_straight_point(result_cnm_snm,nmax,Lat,Lon,caculat_height);    
 end
@@ -246,7 +197,6 @@ gravity_potential=gravity_potential+Gravity_potential;
 gravity_attraction=gravity_attraction+Gravity_attraction;
 gravity_gradient=gravity_gradient+Gravity_gradient;
 end
-toc
 if handles.radiobutton3.Value == 1
 
 f=gravity_potential;
@@ -264,18 +214,14 @@ end
 end
 
 else if  handles.radiobutton2.Value == 1
-%slice
-
+%分层
 num_latyers=str2double(get(handles.edit9,'string'));
 
 [Cnm,Snm]=analysis_slice(nmax,Dlat,Dlon,Nlat,Nlon,data,num_latyers);
 
 if handles.radiobutton6.Value == 1
-
-[gravity_potential,gravity_attraction,gravity_gradient]=synthesis_slice(Cnm,Snm,nmax,lat_max,lat_min,lon_max,lon_min,dlat,dlon,caculat_height,num_latyers);
-
+[gravity_potential,gravity_attraction,gravity_gradient]=synthesis_slice(Cnm,Snm,nmax,Lat,Lon,caculat_height,num_latyers);
 elseif handles.radiobutton7.Value == 1
-   
 [gravity_potential,gravity_attraction,gravity_gradient]=synthesis_slice_point(Cnm,Snm,nmax,Lat,Lon,caculat_height,num_latyers);
 end
 
@@ -298,12 +244,12 @@ end
 end
 end
 if handles.radiobutton6.Value == 1
-
+f=flipud(f);
     for i=1:nlat
         for j=1:nlon
 
-            fresult((i-1)*nlon+j,1)=Lon(j);
-            fresult((i-1)*nlon+j,2)=Lat(i);
+            fresult((i-1)*nlon+j,1)=(j-1)*dlon+lon_min;
+            fresult((i-1)*nlon+j,2)=lat_min+(i-1)*dlat;
             fresult((i-1)*nlon+j,3)=f(i,j);
 
         end
@@ -371,7 +317,7 @@ lonmin=floor(min(table1_data(:,1)));
 
 datap=reshape(table1_data(:,3),nlon,nlat);
 data_p=datap';
-data_p=flipud(data_p);
+
 imagesc([lonmin lonmax],[latmin latmax],data_p);
 
 xlim([lonmin lonmax]);
@@ -379,7 +325,8 @@ ylim([latmin latmax]);
 
 xticks(lonmin:90:lonmax);
 yticks(latmin:45:latmax);
- set(gca, 'YDir', 'normal');
+
+set(gca, 'YDir', 'normal');
 elseif  handles.radiobutton7.Value == 1
 datap=table1_data;
 lonmax=ceil(max(datap(:,1)));
@@ -413,18 +360,12 @@ function pushbutton7_Callback(hObject, eventdata, handles)
 % hObject    handle to pushbutton7 (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-
-[filename,pathname,c]=uiputfile('*.txt','保存');
-output=get(handles.uitable1,'data');
+a=get(handles.uitable1,'data');
+[filename,pathname,c]=uiputfile('*.txt','输入文件名');
 if c==1
     file=[pathname,filename];
-    csvwrite(file,output);
-    h=dialog('Name','Save data','Position',[200 200 200 70]);
-    uicontrol('Style','text','Units','pixels','Position',[50 40 120 20],'FontSize',10,...
-        'Parent',h,'String','save done');  %创建文本内容
-    uicontrol('Units','pixels','Position',[80 10 50 20],'FontSize',10,...
-        'Parent',h,'String','OK','Callback','delete(gcf)');
-
+    csvwrite(file,a);
+    helpdlg('保存成功!');
 end
 
 % --- Executes on button press in pushbutton8.
